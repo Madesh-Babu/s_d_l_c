@@ -27,8 +27,8 @@ Apply discount and tax to a product.
 | Field | Type | Required | Description | Constraints |
 |-------|------|----------|-------------|-------------|
 | id | integer | Yes | Product ID to apply discount | Must be valid product ID |
-| discount | number | Yes | Discount percentage | 1-100 |
-| tax | number | No | Tax percentage | 0-50 |
+| discount | number | Yes | Discount percentage | 1-100 (Pydantic validation) |
+| tax | number | No | Tax percentage | 0-50 (Pydantic validation) |
 
 #### Request Headers
 
@@ -97,21 +97,35 @@ curl -X PATCH "http://127.0.0.1:5000/products/discount" \
 **Missing Required Fields (400 Bad Request)**
 ```json
 {
-  "error": "Product ID and discount percentage are required"
+  "error": "1 validation error for DiscountRequest\n  discount\n    Field required [type=missing, input_value={'id': 1}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.12/v/missing"
 }
 ```
 
 **Invalid Discount (400 Bad Request)**
 ```json
 {
-  "error": "Discount must be a number between 1 and 100"
+  "error": "1 validation error for DiscountRequest\n  discount\n    Input should be greater than 0 [type=greater_than, input_value=-5, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.12/v/greater_than"
+}
+```
+
+**Discount Too High (400 Bad Request)**
+```json
+{
+  "error": "1 validation error for DiscountRequest\n  discount\n    Input should be less than or equal to 100 [type=less_than_equal, input_value=150, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.12/v/less_than_equal"
 }
 ```
 
 **Invalid Tax (400 Bad Request)**
 ```json
 {
-  "error": "Tax must be between 0 and 50"
+  "error": "1 validation error for DiscountRequest\n  tax\n    Input should be greater than or equal to 0 [type=greater_than_equal, input_value=-5, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.12/v/greater_than_equal"
+}
+```
+
+**Tax Too High (400 Bad Request)**
+```json
+{
+  "error": "1 validation error for DiscountRequest\n  tax\n    Input should be less than or equal to 50 [type=less_than_equal, input_value=75, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.12/v/less_than_equal"
 }
 ```
 
@@ -294,7 +308,10 @@ curl -X PATCH "http://127.0.0.1:5000/products/discount" \
 
 1. **Token Validation**: JWT token is validated using `@jwt_required()` decorator
 2. **Role Authorization**: User role is checked using `@role_required("admin", "manager")`
-3. **Input Validation**: Validates required fields and parameter ranges
+3. **Pydantic Validation**: Discount request is validated using `DiscountRequest` schema
+   - ID: Required integer
+   - Discount: Must be greater than 0 and less than or equal to 100
+   - Tax: Must be greater than or equal to 0 and less than or equal to 50
 4. **Product Lookup**: Product is queried from database
 5. **Price Calculation**: Applies discount first, then tax using decorator pattern
 6. **Price Update**: Updates product price in database
@@ -352,30 +369,30 @@ class TaxDecorator(PriceDecorator):
 def discount_product():
     data = request.get_json()
 
-    if not data or "id" not in data or "discount" not in data:
-        return jsonify({"error": "Product ID and discount percentage are required"}), 400
-    
-    product_id = data["id"]
-    discount = data["discount"]
-    tax = data.get("tax", 0)
+    try:
+        discount_request = DiscountRequest(**data)
+        
+        product = Product.query.get(discount_request.id)
 
-    # Validate discount range
-    if not isinstance(discount, (int, float)) or discount <= 0 or discount > 100:
-        return jsonify({"error": "Discount must be a number between 1 and 100"}), 400
-    
-    # Validate tax range
-    if not isinstance(tax, (int, float)) or tax < 0 or tax > 50:
-        return jsonify({"error": "Tax must be between 0 and 50"}), 400
-    
-    product = Product.query.get(product_id)
-    if not product:
-        return jsonify({"error": "Product not found"}), 404
-    
-    updated = DiscountedProductService.apply_discount(product, discount, tax)
-    return jsonify({
-        "message": f"Applied {discount}% discount and {tax}% tax",
-        "new_price": updated.price
-    }), 200
+        if not product:
+            return jsonify({"error": "Product not found"}), 404
+        
+        updated = DiscountedProductService.apply_discount(product, discount_request.discount, discount_request.tax)
+        return jsonify({
+            "message": f"Applied {discount_request.discount}% discount and {discount_request.tax}% tax",
+            "new_price": updated.price
+        }), 200
+    except ValidationError as e:
+        return jsonify({"error": str(e)}), 400
+```
+
+### Pydantic Schema
+
+```python
+class DiscountRequest(BaseModel):
+    id: int
+    discount: float = Field(..., gt=0, le=100)
+    tax: float = Field(0, ge=0, le=50)
 ```
 
 ---
