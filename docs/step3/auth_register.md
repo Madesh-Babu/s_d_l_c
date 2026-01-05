@@ -22,12 +22,12 @@ Register a new user account with role-based access control.
 
 #### Request Body
 
-| Field | Type | Required | Description | Values |
-|-------|------|----------|-------------|--------|
-| username | string | Yes | User's login identifier | 3-80 chars, unique |
-| email | string | Yes | User's email address | Valid email format, unique |
-| password | string | Yes | User's password | Minimum 6 characters |
-| role | string | No | User's permission level | `staff`, `manager`, `admin` |
+| Field | Type | Required | Description | Constraints |
+|-------|------|----------|-------------|-------------|
+| username | string | Yes | User's unique username | 3-80 characters |
+| email | string | Yes | User's email address | Valid email format (Pydantic validation) |
+| password | string | Yes | User's password | 6+ characters (Pydantic validation) |
+| role | string | No | User role | "staff", "manager", or "admin" (default: "staff") |
 
 #### Role Definitions
 
@@ -106,28 +106,42 @@ curl -X POST "http://127.0.0.1:5000/auth/register" \
 **Missing Required Fields (400 Bad Request)**
 ```json
 {
-    "error": "Missing required fields"
+  "error": "1 validation error for UserCreate\n  username\n    Field required [type=missing, input_value={'email': 'test@example.com', 'password': 'password123'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.12/v/missing"
 }
 ```
 
-**Invalid Role (400 Bad Request)**
+**Invalid Email (400 Bad Request)**
 ```json
 {
-    "error": "Invalid role"
+  "error": "1 validation error for UserCreate\n  email\n    Input should match pattern '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$' [type=pattern_match, input_value='invalid-email', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/pattern_match"
+}
+```
+
+**Password Too Short (400 Bad Request)**
+```json
+{
+  "error": "1 validation error for UserCreate\n  password\n    Input should be at least 6 characters long [type=string_too_short, input_value='123', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/string_too_short"
 }
 ```
 
 **Username Already Exists (400 Bad Request)**
 ```json
 {
-    "error": "Username already existis"
+  "error": "Username already exists"
 }
 ```
 
 **Email Already Registered (400 Bad Request)**
 ```json
 {
-    "error": "Email already registered"
+  "error": "Email already registered"
+}
+```
+
+**Invalid Role (400 Bad Request)**
+```json
+{
+  "error": "1 validation error for UserCreate\n  role\n    Input should match pattern '^(staff|manager|admin)$' [type=pattern_match, input_value='invalid_role', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/pattern_match"
 }
 ```
 
@@ -224,20 +238,22 @@ curl -X POST "http://127.0.0.1:5000/auth/register" \
 
 ## 🔧 Implementation Details
 
-### Registration Process
+### Validation Process
 
-1. **Input Validation**: Validates required fields (username, email, password)
-2. **Role Validation**: Checks if role is one of the allowed values
-3. **Uniqueness Checks**: Verifies username and email are not already taken
-4. **Password Hashing**: Securely hashes password using Werkzeug
-5. **User Creation**: Creates new user record in database
-6. **Response**: Returns success message
+1. **Pydantic Validation**: Uses `UserCreate` schema for automatic validation
+   - Username: 3-80 characters, required
+   - Email: Valid email format using regex pattern
+   - Password: Minimum 6 characters
+   - Role: Must match pattern '^(staff|manager|admin)$'
+2. **Uniqueness Check**: Verifies username and email don't already exist
+3. **Password Hashing**: Uses Werkzeug's secure password hashing
+4. **Database Creation**: Creates new user record in database
+5. **Response**: Returns success message
 
 ### Validation Rules
 
 - **Username**: Must be unique, 3-80 characters
 - **Email**: Must be valid email format, unique
-- **Password**: Minimum 6 characters (application level validation)
 - **Role**: Must be one of: `staff`, `manager`, `admin` (defaults to `staff`)
 
 ### Security Features
@@ -326,28 +342,42 @@ if __name__ == "__main__":
 
 ### Common Error Scenarios
 
-1. **Missing Required Fields**
+1. **Missing Required Fields** (Pydantic Validation)
    ```json
    {
-     "error": "Missing required fields"
+     "error": "1 validation error for UserCreate\n  username\n    Field required [type=missing, input_value={'email': 'test@example.com', 'password': 'password123'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.12/v/missing"
    }
    ```
 
-2. **Invalid Role**
+2. **Invalid Email Format** (Pydantic Validation)
    ```json
    {
-     "error": "Invalid role"
+     "error": "1 validation error for UserCreate\n  email\n    Input should match pattern '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$' [type=pattern_match, input_value='invalid-email', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/pattern_match"
    }
    ```
 
-3. **Username Already Exists**
+3. **Password Too Short** (Pydantic Validation)
    ```json
    {
-     "error": "Username already existis"
+     "error": "1 validation error for UserCreate\n  password\n    Input should be at least 6 characters long [type=string_too_short, input_value='123', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/string_too_short"
    }
    ```
 
-4. **Email Already Registered**
+4. **Invalid Role** (Pydantic Validation)
+   ```json
+   {
+     "error": "1 validation error for UserCreate\n  role\n    Input should match pattern '^(staff|manager|admin)$' [type=pattern_match, input_value='invalid_role', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/pattern_match"
+   }
+   ```
+
+5. **Username Already Exists** (Database Constraint)
+   ```json
+   {
+     "error": "Username already exists"
+   }
+   ```
+
+6. **Email Already Registered** (Database Constraint)
    ```json
    {
      "error": "Email already registered"
