@@ -26,11 +26,11 @@ Create a new product in the inventory.
 
 | Field | Type | Required | Description | Constraints |
 |-------|------|----------|-------------|-------------|
-| name | string | Yes | Product name | 1-100 characters |
+| name | string | Yes | Product name | 1-100 characters (Pydantic validation) |
 | description | string | No | Product description | 0-255 characters |
-| price | number | Yes | Product price | Must be positive |
-| stock | integer | Yes | Stock quantity | Must be non-negative |
-| category_id | integer | No | Category ID | Must be valid category |
+| price | number | Yes | Product price | Must be positive (Pydantic validation) |
+| stock | integer | Yes | Initial stock quantity | Must be non-negative (Pydantic validation) |
+| category_id | integer | No | Category ID | Must be valid category ID |
 
 #### Request Headers
 
@@ -119,21 +119,21 @@ curl -X POST "http://127.0.0.1:5000/products/" \
 **Missing Required Fields (400 Bad Request)**
 ```json
 {
-  "error": "Missing field: stock"
+  "error": "1 validation error for ProductCreate\n  name\n    Field required [type=missing, input_value={'price': 99.99, 'stock': 10}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.12/v/missing"
 }
 ```
 
 **Invalid Price (400 Bad Request)**
 ```json
 {
-  "error": "Price must be a positive number"
+  "error": "1 validation error for ProductCreate\n  price\n    Input should be greater than 0 [type=greater_than, input_value=-10, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.12/v/greater_than"
 }
 ```
 
 **Invalid Stock (400 Bad Request)**
 ```json
 {
-  "error": "Stock must be a non-negative integer"
+  "error": "1 validation error for ProductCreate\n  stock\n    Input should be greater than or equal to 0 [type=greater_than_equal, input_value=-5, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.12/v/greater_than_equal"
 }
 ```
 
@@ -302,11 +302,15 @@ curl -X POST "http://127.0.0.1:5000/products/" \
 
 ## 🔧 Implementation Details
 
-### Creation Process
+### Validation Process
 
 1. **Token Validation**: JWT token is validated using `@jwt_required()` decorator
 2. **Role Authorization**: User role is checked using `@role_required("admin", "manager")`
-3. **Input Validation**: Product data is validated using `validate_product_data()`
+3. **Pydantic Validation**: Product data is validated using `ProductCreate` schema
+   - Name: 1-100 characters, required
+   - Price: Must be greater than 0
+   - Stock: Must be greater than or equal to 0
+   - Category ID: Optional, validated if provided
 4. **Category Validation**: Category ID is validated if provided
 5. **Product Creation**: New product record is created in database
 6. **Database Commit**: Product is saved to database
@@ -315,30 +319,34 @@ curl -X POST "http://127.0.0.1:5000/products/" \
 ### Validation Rules
 
 ```python
-def validate_product_data(data):
-    """Validate the product JSON payload."""
-    required_fields = ["name", "price", "stock"]
+# Pydantic schema for product creation
+class ProductCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=255)
+    price: float = Field(..., gt=0)
+    stock: int = Field(..., ge=0)
+    category_id: Optional[int] = None
+```
 
-    # Check required fields
-    for field in required_fields:
-        if field not in data:
-            return False, f"Missing field: {field}"
+### Endpoint Implementation
 
-    # Validate price
-    if not isinstance(data["price"], (int, float)) or data["price"] < 0:
-        return False, "Price must be a positive number"
-
-    # Validate stock
-    if not isinstance(data["stock"], int) or data["stock"] < 0:
-        return False, "Stock must be a non-negative integer"
-
-    # Validate category if provided
-    if "category_id" in data:
-        category = Category.query.get(data["category_id"])
-        if not category:
-            return False, "Invalid category ID"
-
-    return True, None
+```python
+@products_b_p.route("/", methods=["POST"])
+@jwt_required()
+@role_required("admin","manager")
+def add_product():
+    data = request.get_json()
+    
+    try:
+        product_data = ProductCreate(**data)
+        valid, error = validate_product_data(data)
+        if not valid:
+            return jsonify({"error": error}), 400
+        
+        product = product_service.create_product(data)
+        return jsonify({"message": "Product added", "product": product.to_dict()}), 201
+    except ValidationError as e:
+        return jsonify({"error": str(e)}), 400
 ```
 
 ### Security Features
