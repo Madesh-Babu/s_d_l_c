@@ -26,7 +26,7 @@ Create a new category in the system.
 
 | Field | Type | Required | Description | Constraints |
 |-------|------|----------|-------------|-------------|
-| name | string | Yes | Category name | 1-100 characters, unique |
+| name | string | Yes | Category name | 1-100 characters, unique (Pydantic validation) |
 | description | string | No | Category description | 0-255 characters |
 
 #### Request Headers
@@ -99,7 +99,21 @@ curl -X POST "http://127.0.0.1:5000/categories/" \
 **Category Name Required (400 Bad Request)**
 ```json
 {
-  "error": "Category name is required"
+  "error": "1 validation error for CategoryCreate\n  name\n    Field required [type=missing, input_value={'description': 'Test category'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.12/v/missing"
+}
+```
+
+**Empty Category Name (400 Bad Request)**
+```json
+{
+  "error": "1 validation error for CategoryCreate\n  name\n    Input should be at least 1 characters long [type=string_too_short, input_value='', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/string_too_short"
+}
+```
+
+**Category Name Too Long (400 Bad Request)**
+```json
+{
+  "error": "1 validation error for CategoryCreate\n  name\n    Input should be at most 100 characters long [type=string_too_long, input_value='This is a very long category name that exceeds the maximum allowed length', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/string_too_long"
 }
 ```
 
@@ -107,13 +121,6 @@ curl -X POST "http://127.0.0.1:5000/categories/" \
 ```json
 {
   "error": "Category with name 'Electronics' already exists"
-}
-```
-
-**Invalid Description (400 Bad Request)**
-```json
-{
-  "error": "Description must be a string"
 }
 ```
 
@@ -280,11 +287,13 @@ curl -X POST "http://127.0.0.1:5000/categories/" \
 
 ## 🔧 Implementation Details
 
-### Creation Process
+### Validation Process
 
 1. **Token Validation**: JWT token is validated using `@jwt_required()` decorator
 2. **Role Authorization**: User role is checked using `@role_required("admin", "manager")`
-3. **Input Validation**: Category data is validated using `validate_category_data()`
+3. **Pydantic Validation**: Category data is validated using `CategoryCreate` schema
+   - Name: 1-100 characters, required
+   - Description: Optional, max 255 characters
 4. **Uniqueness Check**: Verifies category name doesn't already exist
 5. **Category Creation**: New category record is created in database
 6. **Database Commit**: Category is saved to database
@@ -293,24 +302,38 @@ curl -X POST "http://127.0.0.1:5000/categories/" \
 ### Validation Rules
 
 ```python
-def validate_category_data(data):
-    """Validate the category JSON payload."""
-    if not data:
-        return False, "Request data is missing."
+# Pydantic schema for category creation
+class CategoryCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=255)
+```
 
-    if "name" not in data or not data["name"].strip():
-        return False, "Category name is required."
+### Endpoint Implementation
 
-    # Check description field (if given)
-    if "description" in data and not isinstance(data["description"], str):
-        return False, "Description must be a string."
+```python
+@categories_b_p.route("/", methods=["POST"])
+@jwt_required()
+@role_required("admin","manager")
+def create_category():
+    data = request.get_json()
+    
+    try:
+        category_data = CategoryCreate(**data)
+        valid, error = validate_category_data(data)
+        
+        if not valid:
+            return jsonify({"error": error}), 400
+        
+        category, err = category_service.create_category(category_data.name)
+        if err:
+            return jsonify(err), 400
 
-    # Check for duplicate category name
-    existing_category = Category.query.filter_by(name=data["name"]).first()
-    if existing_category:
-        return False, f"Category with name '{data['name']}' already exists"
-
-    return True, None
+        return jsonify({
+            "message": "Category created successfully",
+            "category": {"id": category.id, "name": category.name}
+        }), 201
+    except ValidationError as e:
+        return jsonify({"error": str(e)}), 400
 ```
 
 ### Security Features
