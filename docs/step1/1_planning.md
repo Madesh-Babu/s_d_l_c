@@ -33,33 +33,6 @@ The project follows clean architecture principles by separating routing, busines
     ↓
     PostgreSQL Database
 
-
----
-
-## Project Structure
-    app/
-    ├── authentication/
-    │ └── routes.py
-    ├── categories/
-    │ └── routes.py
-    ├── products/
-    │ └── routes.py
-    ├── utils/
-    │ └── roles_required.py
-    ├── interfaces.py
-    ├── service.py
-    ├── models.py
-    ├── price_decorator.py
-    ├── config.py
-    ├── init.py
-    tests/
-    ├── test_product.py
-    ├── conftest.py
-    error_handlers.py
-    run.py
-
-
-
 ---
 
 ## Authentication Strategy
