@@ -1,11 +1,11 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
-from Inventory_Management_API.src.services.service import CategoryService,validate_category_data
-from app.utils.roles_required import role_required
-from Inventory_Management_API.src.app.core.interfaces import ICategoryCreator,ICategoryDeleter,ICategoryReader,ICategoryUpdater
-from Inventory_Management_API.src.models.schemas import CategoryCreate, CategoryUpdate
+from src.services.service import CategoryService,validate_category_data
+from src.core.roles_required import role_required
+from src.core.interfaces import ICategoryCreator,ICategoryDeleter,ICategoryReader,ICategoryUpdater
+from src.models.schemas import CategoryCreate, CategoryUpdate
 from pydantic import ValidationError
-from app import db
+from src.api import db
 
 categories_b_p = Blueprint("categories", __name__)
 

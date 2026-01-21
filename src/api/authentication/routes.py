@@ -1,9 +1,9 @@
 from flask import Blueprint, request, jsonify
-from Inventory_Management_API.src.models.models import db,User
+from src.models.models import db,User
 from flask_jwt_extended import create_access_token,jwt_required,get_jwt_identity
-from Inventory_Management_API.src.models.schemas import UserCreate, UserLogin, UserUpdate
+from src.models.schemas import UserCreate, UserLogin, UserUpdate
 from pydantic import ValidationError
-from app.core.logging import get_logger, log_user_action, log_api_error
+from src.core.logging import get_logger, log_user_action, log_api_error
 
 auth_b_p = Blueprint('auth',__name__)
 logger = get_logger(__name__)

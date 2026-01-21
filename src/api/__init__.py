@@ -1,11 +1,11 @@
 import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
-from .core.config import Config, config
+from src.core.config import Config, config
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from error_handlers import register_error_handlers
-from .core.logging import setup_logging, LoggingMiddleware, get_logger
+from src.core.logging import setup_logging, LoggingMiddleware, get_logger
 
 db = SQLAlchemy()
 migrate = Migrate()
@@ -44,9 +44,9 @@ def create_app(config_name=None):
     LoggingMiddleware(app)
     
     # Register blueprints
-    from app.products.routes import products_b_p
-    from app.authentication.routes import auth_b_p
-    from app.categories.routes import categories_b_p
+    from src.api.products.routes import products_b_p
+    from src.api.authentication.routes import auth_b_p
+    from src.api.categories.routes import categories_b_p
 
     app.register_blueprint(products_b_p, url_prefix="/products")
     app.register_blueprint(auth_b_p, url_prefix='/auth')

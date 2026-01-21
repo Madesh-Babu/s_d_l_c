@@ -1,8 +1,9 @@
 """
 Structured Logging Implementation using structlog
 
-This module provides structured logging capabilities with JSON output,
-context management, and correlation ID tracking for the Inventory Management API.
+This module provides structured logging capabilities with JSON output for files
+and colorful console output for development, context management, and correlation 
+ID tracking for the Inventory Management API.
 """
 
 import logging
@@ -10,6 +11,7 @@ import logging.config
 import sys
 import json
 import uuid
+import os
 from contextvars import ContextVar
 from typing import Any, Dict, Optional
 from datetime import datetime
@@ -17,6 +19,130 @@ from datetime import datetime
 import structlog
 from structlog.stdlib import LoggerFactory
 from structlog.processors import JSONRenderer, TimeStamper, add_log_level, StackInfoRenderer
+
+# Import colorama for cross-platform color support
+try:
+    import colorama
+    from colorama import Fore, Back, Style
+    colorama.init()  # Initialize colorama
+    COLORAMA_AVAILABLE = True
+except ImportError:
+    # Fallback to basic ANSI codes if colorama is not available
+    COLORAMA_AVAILABLE = False
+    class Fore:
+        RED = '\033[91m'
+        GREEN = '\033[92m'
+        YELLOW = '\033[93m'
+        BLUE = '\033[94m'
+        MAGENTA = '\033[95m'
+        CYAN = '\033[96m'
+        WHITE = '\033[97m'
+        GRAY = '\033[90m'
+    class Style:
+        RESET_ALL = '\033[0m'
+        BRIGHT = '\033[1m'
+
+# Color mapping for log levels using colorama - more vibrant colors
+LOG_COLORS = {
+    'DEBUG': Style.BRIGHT + (Fore.CYAN if COLORAMA_AVAILABLE else '\033[96m'),
+    'INFO': Style.BRIGHT + (Fore.GREEN if COLORAMA_AVAILABLE else '\033[92m'),
+    'WARNING': Style.BRIGHT + (Fore.YELLOW if COLORAMA_AVAILABLE else '\033[93m'),
+    'ERROR': Style.BRIGHT + (Fore.RED if COLORAMA_AVAILABLE else '\033[91m'),
+    'CRITICAL': Style.BRIGHT + (Fore.MAGENTA if COLORAMA_AVAILABLE else '\033[95m'),
+}
+
+# Additional colors for different parts of the log
+TIMESTAMP_COLOR = Style.BRIGHT + (Fore.BLUE if COLORAMA_AVAILABLE else '\033[94m')
+LOGGER_COLOR = Style.BRIGHT + (Fore.MAGENTA if COLORAMA_AVAILABLE else '\033[95m')
+MESSAGE_COLOR = Style.BRIGHT + (Fore.WHITE if COLORAMA_AVAILABLE else '\033[97m')
+CONTEXT_COLOR = Style.BRIGHT + (Fore.CYAN if COLORAMA_AVAILABLE else '\033[96m')
+USER_COLOR = Style.BRIGHT + (Fore.GREEN if COLORAMA_AVAILABLE else '\033[92m')
+BRACKET_COLOR = Style.BRIGHT + (Fore.YELLOW if COLORAMA_AVAILABLE else '\033[93m')
+SEPARATOR_COLOR = Style.BRIGHT + (Fore.BLUE if COLORAMA_AVAILABLE else '\033[94b')
+
+# Icons for different log levels (using Unicode characters)
+LOG_ICONS = {
+    'DEBUG': '🔍',
+    'INFO': 'ℹ️',
+    'WARNING': '⚠️',
+    'ERROR': '❌',
+    'CRITICAL': '🔥',
+}
+
+# Additional icons for context
+CONTEXT_ICONS = {
+    'correlation': '🔗',
+    'user': '👤',
+    'request': '🌐',
+}
+
+class ColoredFormatter(logging.Formatter):
+    """Custom formatter for colorful console output using colorama."""
+    
+    def format(self, record):
+        # Get the color for the log level
+        color = LOG_COLORS.get(record.levelname, MESSAGE_COLOR)
+        
+        # Extract color codes to avoid f-string backslash issues
+        reset = Style.RESET_ALL if COLORAMA_AVAILABLE else '\033[0m'
+        separator = SEPARATOR_COLOR
+        
+        # Extract just the filename from the full path
+        filename = record.filename
+        if '/' in filename:
+            filename = filename.split('/')[-1]
+        
+        # Format the basic log message with vibrant colors, icons, and file info
+        log_message = f"{LOGGER_COLOR}{record.name}{reset}{separator} - {color} {record.levelname}{reset}{separator} - {CONTEXT_COLOR}{filename}:{record.lineno}{reset}{separator} - {MESSAGE_COLOR}{record.getMessage()}{reset}"
+        
+        # Add extra context if available
+        if hasattr(record, 'correlation_id') and record.correlation_id:
+            log_message += f" {BRACKET_COLOR}[{CONTEXT_ICONS['correlation']} {CONTEXT_COLOR}{record.correlation_id}{reset}{BRACKET_COLOR}]{reset}"
+        
+        return log_message
+
+class ColoredConsoleRenderer:
+    """Custom structlog processor for colorful console output using colorama."""
+    
+    def __call__(self, logger, method_name: str, event_dict: Dict[str, Any]) -> str:
+        # Get the level and color
+        level = event_dict.get('level', 'INFO').upper()
+        color = LOG_COLORS.get(level, MESSAGE_COLOR)
+        icon = LOG_ICONS.get(level, '📝')
+        
+        # Extract key information
+        logger_name = event_dict.get('logger', 'unknown')
+        message = event_dict.get('event', '')
+        timestamp = event_dict.get('timestamp', '')
+        
+        # Get caller information (filename and line number)
+        caller_info = event_dict.get('caller', {})
+        filename = caller_info.get('filename', 'unknown')
+        line_number = caller_info.get('line_number', '?')
+        
+        # Extract just the filename from the full path
+        if filename != 'unknown' and '/' in filename:
+            filename = filename.split('/')[-1]
+        
+        # Build the colored message with vibrant colors and icons
+        reset = Style.RESET_ALL if COLORAMA_AVAILABLE else '\033[0m'
+        
+        # Base message with file and line info
+        base_message = f"{TIMESTAMP_COLOR}{timestamp}{reset}{SEPARATOR_COLOR} - {LOGGER_COLOR}{logger_name}{reset}{SEPARATOR_COLOR} - {CONTEXT_COLOR}{filename}:{line_number}{reset}{SEPARATOR_COLOR} - {color}{icon} {level}{reset}{SEPARATOR_COLOR} - {MESSAGE_COLOR}{message}{reset}"
+        
+        colored_message = base_message
+        
+        # Add correlation ID if available with colorful brackets and icon
+        correlation_id = event_dict.get('correlation_id')
+        if correlation_id:
+            colored_message += f" {BRACKET_COLOR}[{CONTEXT_ICONS['correlation']} {CONTEXT_COLOR}{correlation_id[:8]}{reset}{BRACKET_COLOR}]{reset}"
+        
+        # Add user info if available with colorful brackets and icon
+        user_id = event_dict.get('user_id')
+        if user_id:
+            colored_message += f" {BRACKET_COLOR}[{CONTEXT_ICONS['user']} {USER_COLOR}User: {user_id}{reset}{BRACKET_COLOR}]{reset}"
+        
+        return colored_message
 
 # Context variables for request tracking
 correlation_id: ContextVar[str] = ContextVar("correlation_id", default=None)
@@ -66,6 +192,11 @@ def add_environment_info_processor(logger, method_name: str, event_dict: Dict[st
 def _configure_standard_logging(log_level: str = "INFO") -> None:
     """Configure standard Python logging for structlog integration."""
     
+    # Ensure logs directory exists
+    logs_dir = "logs"
+    if not os.path.exists(logs_dir):
+        os.makedirs(logs_dir, exist_ok=True)
+    
     # Create custom formatter for JSON output
     class JSONFormatter(logging.Formatter):
         def format(self, record):
@@ -74,29 +205,18 @@ def _configure_standard_logging(log_level: str = "INFO") -> None:
                 "level": record.levelname,
                 "logger": record.name,
                 "message": record.getMessage(),
-                "service_name": service_name.get(),
-                "correlation_id": correlation_id.get(),
-                "user_id": user_id.get(),
-                "request_path": request_path.get(),
-                "request_method": request_method.get(),
-                "caller": {
-                    "filename": record.filename,
-                    "line_number": record.lineno,
-                    "function": record.funcName
-                }
+                "module": record.module,
+                "function": record.funcName,
+                "line": record.lineno,
             }
             
-            # Add exception info if present
-            if record.exc_info:
-                log_entry["exception"] = self.formatException(record.exc_info)
-            
-            # Add extra fields from record
+            # Add extra fields if they exist
             for key, value in record.__dict__.items():
-                if key not in ["name", "msg", "args", "levelname", "levelno", "pathname", 
-                              "filename", "module", "lineno", "funcName", "created", 
-                              "msecs", "relativeCreated", "thread", "threadName", 
-                              "processName", "process", "getMessage", "exc_info", 
-                              "exc_text", "stack_info"]:
+                if key not in ['name', 'msg', 'args', 'levelname', 'levelno', 'pathname', 
+                              'filename', 'module', 'lineno', 'funcName', 'created', 
+                              'msecs', 'relativeCreated', 'thread', 'threadName', 
+                              'processName', 'process', 'getMessage', 'exc_info', 
+                              'exc_text', 'stack_info']:
                     log_entry[key] = value
             
             return json.dumps(log_entry, default=str)
@@ -109,22 +229,22 @@ def _configure_standard_logging(log_level: str = "INFO") -> None:
             "json": {
                 "()": JSONFormatter,
             },
-            "console": {
-                "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            "colored": {
+                "()": ColoredFormatter,
             },
         },
         "handlers": {
             "console": {
                 "class": "logging.StreamHandler",
                 "level": log_level,
-                "formatter": "json",
+                "formatter": "colored",  # Use colored formatter for console
                 "stream": sys.stdout,
             },
             "file": {
                 "class": "logging.handlers.RotatingFileHandler",
                 "level": log_level,
-                "formatter": "json",
-                "filename": "logs/inventory_api.log",
+                "formatter": "json",  # Keep JSON format for files
+                "filename": os.path.join(logs_dir, "inventory_api.log"),  # Use full path
                 "maxBytes": 10485760,  # 10MB
                 "backupCount": 5,
             },
@@ -137,6 +257,11 @@ def _configure_standard_logging(log_level: str = "INFO") -> None:
             "app": {
                 "level": log_level,
                 "handlers": ["console", "file"],
+                "propagate": False,
+            },
+            "werkzeug": {
+                "level": "INFO",
+                "handlers": ["console"],
                 "propagate": False,
             },
         },
@@ -157,6 +282,9 @@ def setup_logging(log_level: str = "INFO", environment: str = "development") -> 
     # Configure standard logging
     _configure_standard_logging(log_level)
     
+    # Choose renderer based on environment
+    console_renderer = ColoredConsoleRenderer() if environment == "development" else JSONRenderer()
+    
     # Configure structlog
     structlog.configure(
         processors=[
@@ -167,9 +295,9 @@ def setup_logging(log_level: str = "INFO", environment: str = "development") -> 
             add_context_processor,
             add_environment_info_processor,
             structlog.stdlib.PositionalArgumentsFormatter(),
-            TimeStamper(fmt="iso"),
+            TimeStamper(fmt="%H:%M:%S"),  # Use simple time format
             StackInfoRenderer(),
-            JSONRenderer()
+            console_renderer  # Use colored console renderer for development
         ],
         context_class=dict,
         logger_factory=LoggerFactory(),

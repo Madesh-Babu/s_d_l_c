@@ -4,11 +4,42 @@ from typing import Optional
 class Config:
     """Base configuration class."""
     
-    # Database Configuration
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        "DATABASE_URL", "sqlite:///inventory.db"
-    )
+    # PostgreSQL Configuration - Environment variables required (no defaults for security)
+    PG_USER = os.getenv("PG_USER")
+    PG_PASSWORD = os.getenv("PG_PASSWORD")
+    PG_HOST = os.getenv("PG_HOST")
+    PG_PORT = os.getenv("PG_PORT")
+    PG_DB = os.getenv("PG_DB")
+    
+    # Database URI constructed from individual variables
+    @property
+    def SQLALCHEMY_DATABASE_URI(self):
+        """SQLAlchemy database URI with validation."""
+        return self._get_validated_uri()
+    
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
+    def _get_validated_uri(self):
+        """Get validated PostgreSQL URI."""
+        required_vars = {
+            'PG_USER': self.PG_USER,
+            'PG_PASSWORD': self.PG_PASSWORD,
+            'PG_HOST': self.PG_HOST,
+            'PG_PORT': self.PG_PORT,
+            'PG_DB': self.PG_DB
+        }
+        
+        missing_vars = [var for var, value in required_vars.items() if not value]
+        if missing_vars:
+            raise ValueError(
+                f"Missing required PostgreSQL environment variables: {', '.join(missing_vars)}. "
+                "Please set these in your .env.local file."
+            )
+        
+        return (
+            f"postgresql://{self.PG_USER}:{self.PG_PASSWORD}"
+            f"@{self.PG_HOST}:{self.PG_PORT}/{self.PG_DB}"
+        )
     
     # JWT Configuration
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "a1b2c3d4")
@@ -56,10 +87,23 @@ class Settings:
         self.LOG_ENVIRONMENT = os.getenv("LOG_ENVIRONMENT", "development")
         self.LOG_FILE_PATH = os.getenv("LOG_FILE_PATH", "logs/inventory_api.log")
         
-        # Database settings
-        self.DATABASE_URL = os.getenv(
-            "DATABASE_URL", "sqlite:///inventory.db"
+        # PostgreSQL settings from individual environment variables (required - no defaults)
+        self.PG_USER = os.getenv("PG_USER")
+        self.PG_PASSWORD = os.getenv("PG_PASSWORD")
+        self.PG_HOST = os.getenv("PG_HOST")
+        self.PG_PORT = os.getenv("PG_PORT")
+        self.PG_DB = os.getenv("PG_DB")
+        
+        # Validate required PostgreSQL environment variables
+        self._validate_postgres_config()
+        
+        # Database URI constructed from individual variables
+        self.PG_URI = (
+            f"postgresql://{self.PG_USER}:{self.PG_PASSWORD}"
+            f"@{self.PG_HOST}:{self.PG_PORT}/{self.PG_DB}"
         )
+        
+        self.DATABASE_URL = self.PG_URI
         
         # JWT settings
         self.JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "a1b2c3d4")
@@ -72,6 +116,23 @@ class Settings:
         self.APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
         self.APP_HOST = os.getenv("APP_HOST", "127.0.0.1")
         self.APP_PORT = int(os.getenv("APP_PORT", "5000"))
+    
+    def _validate_postgres_config(self):
+        """Validate that all required PostgreSQL environment variables are set."""
+        required_vars = {
+            'PG_USER': self.PG_USER,
+            'PG_PASSWORD': self.PG_PASSWORD,
+            'PG_HOST': self.PG_HOST,
+            'PG_PORT': self.PG_PORT,
+            'PG_DB': self.PG_DB
+        }
+        
+        missing_vars = [var for var, value in required_vars.items() if not value]
+        if missing_vars:
+            raise ValueError(
+                f"Missing required PostgreSQL environment variables: {', '.join(missing_vars)}. "
+                "Please set these in your .env.local file."
+            )
     
     @property
     def config_class(self):

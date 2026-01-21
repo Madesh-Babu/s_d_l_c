@@ -1,7 +1,7 @@
-from Inventory_Management_API.src.models.models import db, Category,Product
-from Inventory_Management_API.src.app.core.interfaces import (IProductCreator, IProductReader, IProductUpdater, IProductDeleter, ICategoryDeleter, ICategoryCreator,ICategoryReader,ICategoryUpdater)
-from app.price_decorator import Price, DiscountDecorator, TaxDecorator
-from Inventory_Management_API.src.models.schemas import (
+from src.models.models import db, Category,Product
+from src.core.interfaces import (IProductCreator, IProductReader, IProductUpdater, IProductDeleter, ICategoryDeleter, ICategoryCreator,ICategoryReader,ICategoryUpdater)
+from src.services.price_decorator import Price, DiscountDecorator, TaxDecorator
+from src.models.schemas import (
     CategoryCreate, CategoryUpdate, ProductCreate, ProductUpdate,
     DiscountRequest, UserCreate, UserUpdate
 )
