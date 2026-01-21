@@ -1,4 +1,4 @@
-from ..app import db
+from ..api import db
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash,check_password_hash
 

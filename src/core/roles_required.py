@@ -2,7 +2,7 @@ from functools import wraps
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity, get_jwt
 from flask import jsonify
 from werkzeug.exceptions import Forbidden, Unauthorized
-from Inventory_Management_API.src.models.models import User
+from src.models.models import User
 
 def role_required(*roles):
     """Restrict route access to specific roles (checks DB or token claims)."""
