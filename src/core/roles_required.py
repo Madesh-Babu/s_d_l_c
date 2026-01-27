@@ -12,7 +12,7 @@ def role_required(*roles):
             verify_jwt_in_request()
             identity = get_jwt_identity()
             claims = get_jwt()
-
+            print('ccccc')
             token_role = claims.get("role")
             if token_role:
                 if token_role not in roles:
