@@ -1,29 +1,24 @@
 """
-Structured Logging Implementation using structlog
+Ultra-Simplified Logging Implementation
 
-This module provides structured logging capabilities with JSON output for files
-and colorful console output for development, context management, and correlation 
-ID tracking for the Inventory Management API.
+This module provides essential logging capabilities with:
+- user_id
+- timestamp
+- filepath and line number
+- colorama coloring
+- log level and message
 """
 
 import logging
-import logging.config
 import sys
-import json
-import uuid
 import os
-from contextvars import ContextVar
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 from datetime import datetime
-
-import structlog
-from structlog.stdlib import LoggerFactory
-from structlog.processors import JSONRenderer, TimeStamper, add_log_level, StackInfoRenderer
 
 # Import colorama for cross-platform color support
 try:
     import colorama
-    from colorama import Fore, Back, Style
+    from colorama import Fore, Style
     colorama.init()  # Initialize colorama
     COLORAMA_AVAILABLE = True
 except ImportError:
@@ -37,12 +32,11 @@ except ImportError:
         MAGENTA = '\033[95m'
         CYAN = '\033[96m'
         WHITE = '\033[97m'
-        GRAY = '\033[90m'
     class Style:
         RESET_ALL = '\033[0m'
         BRIGHT = '\033[1m'
 
-# Color mapping for log levels using colorama - more vibrant colors
+# Color mapping for log levels
 LOG_COLORS = {
     'DEBUG': Style.BRIGHT + (Fore.CYAN if COLORAMA_AVAILABLE else '\033[96m'),
     'INFO': Style.BRIGHT + (Fore.GREEN if COLORAMA_AVAILABLE else '\033[92m'),
@@ -51,16 +45,7 @@ LOG_COLORS = {
     'CRITICAL': Style.BRIGHT + (Fore.MAGENTA if COLORAMA_AVAILABLE else '\033[95m'),
 }
 
-# Additional colors for different parts of the log
-TIMESTAMP_COLOR = Style.BRIGHT + (Fore.BLUE if COLORAMA_AVAILABLE else '\033[94m')
-LOGGER_COLOR = Style.BRIGHT + (Fore.MAGENTA if COLORAMA_AVAILABLE else '\033[95m')
-MESSAGE_COLOR = Style.BRIGHT + (Fore.WHITE if COLORAMA_AVAILABLE else '\033[97m')
-CONTEXT_COLOR = Style.BRIGHT + (Fore.CYAN if COLORAMA_AVAILABLE else '\033[96m')
-USER_COLOR = Style.BRIGHT + (Fore.GREEN if COLORAMA_AVAILABLE else '\033[92m')
-BRACKET_COLOR = Style.BRIGHT + (Fore.YELLOW if COLORAMA_AVAILABLE else '\033[93m')
-SEPARATOR_COLOR = Style.BRIGHT + (Fore.BLUE if COLORAMA_AVAILABLE else '\033[94b')
-
-# Icons for different log levels (using Unicode characters)
+# Icons for different log levels
 LOG_ICONS = {
     'DEBUG': '🔍',
     'INFO': 'ℹ️',
@@ -69,21 +54,24 @@ LOG_ICONS = {
     'CRITICAL': '🔥',
 }
 
-# Additional icons for context
-CONTEXT_ICONS = {
-    'correlation': '🔗',
-    'user': '👤',
-    'request': '🌐',
-}
+# Colors for different parts of the log message
+TIMESTAMP_COLOR = Style.BRIGHT + (Fore.BLUE if COLORAMA_AVAILABLE else '\033[94m')
+FILE_COLOR = Style.BRIGHT + (Fore.MAGENTA if COLORAMA_AVAILABLE else '\033[95m')
+LINE_COLOR = Style.BRIGHT + (Fore.CYAN if COLORAMA_AVAILABLE else '\033[96m')
+USER_COLOR = Style.BRIGHT + (Fore.GREEN if COLORAMA_AVAILABLE else '\033[92m')
+MESSAGE_COLOR = Style.BRIGHT + (Fore.WHITE if COLORAMA_AVAILABLE else '\033[97m')
+SEPARATOR_COLOR = Style.BRIGHT + (Fore.BLUE if COLORAMA_AVAILABLE else '\033[94m')
+
 
 class ColoredFormatter(logging.Formatter):
-    """Custom formatter for colorful console output using colorama."""
+    """Custom formatter with file and line numbers and colors."""
     
     def format(self, record):
         # Get the color for the log level
         color = LOG_COLORS.get(record.levelname, MESSAGE_COLOR)
+        icon = LOG_ICONS.get(record.levelname, '📝')
         
-        # Extract color codes to avoid f-string backslash issues
+        # Extract color codes
         reset = Style.RESET_ALL if COLORAMA_AVAILABLE else '\033[0m'
         separator = SEPARATOR_COLOR
         
@@ -92,411 +80,175 @@ class ColoredFormatter(logging.Formatter):
         if '/' in filename:
             filename = filename.split('/')[-1]
         
-        # Format the basic log message with vibrant colors, icons, and file info
-        log_message = f"{LOGGER_COLOR}{record.name}{reset}{separator} - {color} {record.levelname}{reset}{separator} - {CONTEXT_COLOR}{filename}:{record.lineno}{reset}{separator} - {MESSAGE_COLOR}{record.getMessage()}{reset}"
+        # Get user_id from record if available
+        user_id = getattr(record, 'user_id', 'N/A')
         
-        # Add extra context if available
-        if hasattr(record, 'correlation_id') and record.correlation_id:
-            log_message += f" {BRACKET_COLOR}[{CONTEXT_ICONS['correlation']} {CONTEXT_COLOR}{record.correlation_id}{reset}{BRACKET_COLOR}]{reset}"
+        # Format timestamp
+        timestamp = datetime.fromtimestamp(record.created).strftime("%H:%M:%S")
+        
+        # Format the essential log message
+        log_message = (
+            f"{TIMESTAMP_COLOR}{timestamp}{reset}{separator} - "
+            f"{FILE_COLOR}{filename}{reset}{LINE_COLOR}:{record.lineno}{reset}{separator} - "
+            f"{USER_COLOR}user:{user_id}{reset}{separator} - "
+            f"{color}{icon} {record.levelname}{reset}{separator} - "
+            f"{MESSAGE_COLOR}{record.getMessage()}{reset}"
+        )
         
         return log_message
-
-class ColoredConsoleRenderer:
-    """Custom structlog processor for colorful console output using colorama."""
-    
-    def __call__(self, logger, method_name: str, event_dict: Dict[str, Any]) -> str:
-        # Get the level and color
-        level = event_dict.get('level', 'INFO').upper()
-        color = LOG_COLORS.get(level, MESSAGE_COLOR)
-        icon = LOG_ICONS.get(level, '📝')
-        
-        # Extract key information
-        logger_name = event_dict.get('logger', 'unknown')
-        message = event_dict.get('event', '')
-        timestamp = event_dict.get('timestamp', '')
-        
-        # Get caller information (filename and line number)
-        caller_info = event_dict.get('caller', {})
-        filename = caller_info.get('filename', 'unknown')
-        line_number = caller_info.get('line_number', '?')
-        
-        # Extract just the filename from the full path
-        if filename != 'unknown' and '/' in filename:
-            filename = filename.split('/')[-1]
-        
-        # Build the colored message with vibrant colors and icons
-        reset = Style.RESET_ALL if COLORAMA_AVAILABLE else '\033[0m'
-        
-        # Base message with file and line info
-        base_message = f"{TIMESTAMP_COLOR}{timestamp}{reset}{SEPARATOR_COLOR} - {LOGGER_COLOR}{logger_name}{reset}{SEPARATOR_COLOR} - {CONTEXT_COLOR}{filename}:{line_number}{reset}{SEPARATOR_COLOR} - {color}{icon} {level}{reset}{SEPARATOR_COLOR} - {MESSAGE_COLOR}{message}{reset}"
-        
-        colored_message = base_message
-        
-        # Add correlation ID if available with colorful brackets and icon
-        correlation_id = event_dict.get('correlation_id')
-        if correlation_id:
-            colored_message += f" {BRACKET_COLOR}[{CONTEXT_ICONS['correlation']} {CONTEXT_COLOR}{correlation_id[:8]}{reset}{BRACKET_COLOR}]{reset}"
-        
-        # Add user info if available with colorful brackets and icon
-        user_id = event_dict.get('user_id')
-        if user_id:
-            colored_message += f" {BRACKET_COLOR}[{CONTEXT_ICONS['user']} {USER_COLOR}User: {user_id}{reset}{BRACKET_COLOR}]{reset}"
-        
-        return colored_message
-
-# Context variables for request tracking
-correlation_id: ContextVar[str] = ContextVar("correlation_id", default=None)
-user_id: ContextVar[str] = ContextVar("user_id", default=None)
-request_path: ContextVar[str] = ContextVar("request_path", default=None)
-request_method: ContextVar[str] = ContextVar("request_method", default=None)
-service_name: ContextVar[str] = ContextVar("service_name", default="inventory-api")
-
-
-def add_caller_info_processor(logger, method_name: str, event_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """Add caller information (filename and line number) to log entries."""
-    record = event_dict.get("_record")
-    if record:
-        event_dict["caller"] = {
-            "filename": record.filename,
-            "line_number": record.lineno,
-            "function": record.funcName
-        }
-    return event_dict
-
-
-def add_context_processor(logger, method_name: str, event_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """Add context variables to log entries."""
-    context_vars = {
-        "correlation_id": correlation_id.get(),
-        "user_id": user_id.get(),
-        "request_path": request_path.get(),
-        "request_method": request_method.get(),
-        "service_name": service_name.get()
-    }
-    
-    # Only add non-None context variables
-    for key, value in context_vars.items():
-        if value is not None:
-            event_dict[key] = value
-    
-    return event_dict
-
-
-def add_environment_info_processor(logger, method_name: str, event_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """Add environment information to log entries."""
-    event_dict["environment"] = event_dict.get("environment", "development")
-    event_dict["timestamp"] = datetime.utcnow().isoformat()
-    return event_dict
-
-
-def _configure_standard_logging(log_level: str = "INFO") -> None:
-    """Configure standard Python logging for structlog integration."""
-    
-    # Ensure logs directory exists
-    logs_dir = "logs"
-    if not os.path.exists(logs_dir):
-        os.makedirs(logs_dir, exist_ok=True)
-    
-    # Create custom formatter for JSON output
-    class JSONFormatter(logging.Formatter):
-        def format(self, record):
-            log_entry = {
-                "timestamp": datetime.fromtimestamp(record.created).isoformat(),
-                "level": record.levelname,
-                "logger": record.name,
-                "message": record.getMessage(),
-                "module": record.module,
-                "function": record.funcName,
-                "line": record.lineno,
-            }
-            
-            # Add extra fields if they exist
-            for key, value in record.__dict__.items():
-                if key not in ['name', 'msg', 'args', 'levelname', 'levelno', 'pathname', 
-                              'filename', 'module', 'lineno', 'funcName', 'created', 
-                              'msecs', 'relativeCreated', 'thread', 'threadName', 
-                              'processName', 'process', 'getMessage', 'exc_info', 
-                              'exc_text', 'stack_info']:
-                    log_entry[key] = value
-            
-            return json.dumps(log_entry, default=str)
-    
-    # Configure logging
-    logging_config = {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {
-            "json": {
-                "()": JSONFormatter,
-            },
-            "colored": {
-                "()": ColoredFormatter,
-            },
-        },
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "level": log_level,
-                "formatter": "colored",  # Use colored formatter for console
-                "stream": sys.stdout,
-            },
-            "file": {
-                "class": "logging.handlers.RotatingFileHandler",
-                "level": log_level,
-                "formatter": "json",  # Keep JSON format for files
-                "filename": os.path.join(logs_dir, "inventory_api.log"),  # Use full path
-                "maxBytes": 10485760,  # 10MB
-                "backupCount": 5,
-            },
-        },
-        "loggers": {
-            "": {  # Root logger
-                "level": log_level,
-                "handlers": ["console", "file"],
-            },
-            "app": {
-                "level": log_level,
-                "handlers": ["console", "file"],
-                "propagate": False,
-            },
-            "werkzeug": {
-                "level": "INFO",
-                "handlers": ["console"],
-                "propagate": False,
-            },
-        },
-    }
-    
-    logging.config.dictConfig(logging_config)
 
 
 def setup_logging(log_level: str = "INFO", environment: str = "development") -> None:
     """
-    Initialize structured logging configuration.
+    Setup ultra-simplified logging configuration.
     
     Args:
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         environment: Environment name (development, staging, production)
     """
     
-    # Configure standard logging
-    _configure_standard_logging(log_level)
+    # Configure standard logging with custom formatter
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(ColoredFormatter())
     
-    # Choose renderer based on environment
-    console_renderer = ColoredConsoleRenderer() if environment == "development" else JSONRenderer()
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, log_level.upper()))
+    root_logger.handlers.clear()  # Remove existing handlers
+    root_logger.addHandler(handler)
     
-    # Configure structlog
-    structlog.configure(
-        processors=[
-            structlog.stdlib.filter_by_level,
-            structlog.stdlib.add_logger_name,
-            add_log_level,
-            add_caller_info_processor,
-            add_context_processor,
-            add_environment_info_processor,
-            structlog.stdlib.PositionalArgumentsFormatter(),
-            TimeStamper(fmt="%H:%M:%S"),  # Use simple time format
-            StackInfoRenderer(),
-            console_renderer  # Use colored console renderer for development
-        ],
-        context_class=dict,
-        logger_factory=LoggerFactory(),
-        wrapper_class=structlog.stdlib.BoundLogger,
-        cache_logger_on_first_use=True,
-    )
-    
-    # Set service name based on environment
-    service_name.set(f"inventory-api-{environment}")
+    # Configure structlog to use standard logging
+    try:
+        import structlog
+        structlog.configure(
+            processors=[
+                structlog.stdlib.filter_by_level,
+                structlog.stdlib.add_logger_name,
+                structlog.stdlib.add_log_level,
+                structlog.stdlib.PositionalArgumentsFormatter(),
+                structlog.processors.StackInfoRenderer(),
+                structlog.processors.format_exc_info,
+                structlog.processors.UnicodeDecoder(),
+                structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+            ],
+            context_class=dict,
+            logger_factory=structlog.stdlib.LoggerFactory(),
+            wrapper_class=structlog.stdlib.BoundLogger,
+            cache_logger_on_first_use=True,
+        )
+        
+        # Override the standard logging formatter to handle structlog messages
+        class StructlogColoredFormatter(ColoredFormatter):
+            def format(self, record):
+                # Handle structlog messages
+                if hasattr(record, 'msg') and isinstance(record.msg, dict):
+                    # Store the original event_dict and extract user_id
+                    event_dict = record.msg
+                    user_id = event_dict.get('user_id', 'N/A')
+                    
+                    # Extract the actual message
+                    event = event_dict.get('event', str(record.msg))
+                    record.msg = event
+                    
+                    # Set user_id as an attribute for the formatter to use
+                    record.user_id = user_id
+                
+                return super().format(record)
+        
+        # Update the handler to use the structlog-aware formatter
+        handler.setFormatter(StructlogColoredFormatter())
+        
+    except ImportError:
+        # If structlog is not available, use standard logging only
+        pass
 
 
-def get_logger(name: str) -> structlog.stdlib.BoundLogger:
+def get_logger(name: str):
     """
-    Get a structured logger instance.
+    Get a logger instance.
     
     Args:
-        name: Logger name (typically __name__)
+        name: Logger name (usually __name__)
         
     Returns:
-        Configured structlog logger instance
+        Configured logger instance
     """
-    return structlog.get_logger(name)
+    try:
+        import structlog
+        return structlog.get_logger(name)
+    except ImportError:
+        return logging.getLogger(name)
 
 
-def generate_correlation_id() -> str:
-    """Generate a unique correlation ID for request tracking."""
-    return str(uuid.uuid4())
-
-
-def add_correlation_context(
-    correlation_id_val: Optional[str] = None,
-    user_id_val: Optional[str] = None,
-    request_path_val: Optional[str] = None,
-    request_method_val: Optional[str] = None
-) -> None:
+def log_user_action(action: str, user_id: str, **kwargs):
     """
-    Add context variables for the current request.
+    Log user action with user_id.
     
     Args:
-        correlation_id_val: Unique correlation ID for the request
-        user_id_val: User ID performing the action
-        request_path_val: API endpoint path
-        request_method_val: HTTP method
+        action: Action description
+        user_id: User ID
+        **kwargs: Additional context
     """
-    if correlation_id_val:
-        correlation_id.set(correlation_id_val)
-    if user_id_val:
-        user_id.set(user_id_val)
-    if request_path_val:
-        request_path.set(request_path_val)
-    if request_method_val:
-        request_method.set(request_method_val)
+    logger = get_logger(__name__)
+    logger.info(f"User action: {action}", id=user_id, **kwargs)
 
 
-class RequestLoggingContext:
-    """Context manager for request-specific logging context."""
+def log_api_error(error: str, **kwargs):
+    """
+    Log API error with context.
     
-    def __init__(
-        self,
-        correlation_id_val: Optional[str] = None,
-        user_id_val: Optional[str] = None,
-        request_path_val: Optional[str] = None,
-        request_method_val: Optional[str] = None
-    ):
-        self.correlation_id_val = correlation_id_val or generate_correlation_id()
-        self.user_id_val = user_id_val
-        self.request_path_val = request_path_val
-        self.request_method_val = request_method_val
-        
-        # Store previous context values
-        self.prev_correlation_id = correlation_id.get()
-        self.prev_user_id = user_id.get()
-        self.prev_request_path = request_path.get()
-        self.prev_request_method = request_method.get()
-    
-    def __enter__(self):
-        """Set the logging context."""
-        add_correlation_context(
-            self.correlation_id_val,
-            self.user_id_val,
-            self.request_path_val,
-            self.request_method_val
-        )
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Reset the logging context."""
-        correlation_id.set(self.prev_correlation_id)
-        user_id.set(self.prev_user_id)
-        request_path.set(self.prev_request_path)
-        request_method.set(self.prev_request_method)
+    Args:
+        error: Error description
+        **kwargs: Additional context
+    """
+    logger = get_logger(__name__)
+    logger.error(f"API Error: {error}", **kwargs)
 
 
 class LoggingMiddleware:
-    """Flask middleware for request logging with correlation tracking."""
+    """Simple middleware for request logging."""
     
-    def __init__(self, app, logger_name: str = "flask.middleware"):
+    def __init__(self, app):
         self.app = app
-        self.logger = get_logger(logger_name)
+        self.logger = get_logger(__name__)
         self.init_app(app)
     
     def init_app(self, app):
-        """Initialize the middleware with Flask app."""
-        app.before_request(self._before_request)
-        app.after_request(self._after_request)
-        app.teardown_appcontext(self._teardown_request)
+        """Initialize middleware with Flask app."""
+        app.before_request(self.before_request)
+        app.after_request(self.after_request)
     
-    def _before_request(self):
-        """Set up logging context before each request."""
-        from flask import request, g
-        
-        # Generate correlation ID
-        corr_id = generate_correlation_id()
-        g.correlation_id = corr_id
-        g.start_time = datetime.utcnow()
-        
-        # Set logging context
-        add_correlation_context(
-            correlation_id_val=corr_id,
-            request_path_val=request.path,
-            request_method_val=request.method
-        )
-        
-        # Log request start
+    def before_request(self):
+        """Log request start."""
+        from flask import request
         self.logger.info(
-            "Request started",
-            method=request.method,
-            path=request.path,
-            query_string=dict(request.args),
-            user_agent=request.headers.get("User-Agent"),
-            remote_addr=request.remote_addr
+            f"Request started: {request.method} {request.path}",
+            id=getattr(request, 'user_id', 'anonymous')
         )
     
-    def _after_request(self, response):
+    def after_request(self, response):
         """Log request completion."""
-        from flask import request, g
-        
-        try:
-            # Calculate request duration
-            start_time = getattr(g, 'start_time', datetime.utcnow())
-            duration = (datetime.utcnow() - start_time).total_seconds()
-            
-            # Log request completion
-            self.logger.info(
-                "Request completed",
-                method=request.method,
-                path=request.path,
-                status_code=response.status_code,
-                duration_seconds=duration,
-                response_size=len(response.get_data() or b'')
-            )
-        except Exception as e:
-            self.logger.error("Error in after_request logging", error=str(e))
-        
+        from flask import request
+        self.logger.info(
+            f"Request completed: {request.method} {request.path} - {response.status_code}",
+            id=getattr(request, 'user_id', 'anonymous')
+        )
         return response
+
+
+# Example usage and testing
+if __name__ == "__main__":
+    # Setup logging
+    setup_logging("INFO", "development")
     
-    def _teardown_request(self, exception):
-        """Clean up request context."""
-        from flask import g
-        
-        if exception:
-            self.logger.error(
-                "Request failed with exception",
-                exception=str(exception),
-                exc_info=True
-            )
-        
-        # Clean up context variables
-        correlation_id.set(None)
-        user_id.set(None)
-        request_path.set(None)
-        request_method.set(None)
-
-
-# Utility functions for common logging patterns
-def log_user_action(action: str, user_id: str, **kwargs):
-    """Log user action with context."""
+    # Get logger
     logger = get_logger(__name__)
-    logger.info(f"User action: {action}", user_id=user_id, action=action, **kwargs)
-
-
-def log_api_error(error: str, error_code: str = None, **kwargs):
-    """Log API error with context."""
-    logger = get_logger(__name__)
-    logger.error(f"API error: {error}", error=error, error_code=error_code, **kwargs)
-
-
-def log_business_event(event: str, **kwargs):
-    """Log business event with context."""
-    logger = get_logger(__name__)
-    logger.info(f"Business event: {event}", event=event, **kwargs)
-
-
-def log_performance(operation: str, duration: float, **kwargs):
-    """Log performance metrics."""
-    logger = get_logger(__name__)
-    logger.info(
-        f"Performance: {operation}",
-        operation=operation,
-        duration_seconds=duration,
-        **kwargs
-    )
+    
+    # Test logging with essential information
+    logger.info("This is a test message", id="12345")
+    logger.warning("This is a warning message", id="67890")
+    logger.error("This is an error message", id="11111")
+    
+    # Test user action logging
+    log_user_action("user_login", "12345", ip_address="192.168.1.1")
+    log_api_error("Validation failed", endpoint="/auth/register", id="12345")
