@@ -63,4 +63,3 @@ class Product(db.Model):
         }
     
 
-

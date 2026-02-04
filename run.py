@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# !/usr/bin/env python3
 """
 Inventory Management API - Application Entry Point
 
@@ -32,7 +32,7 @@ def main():
         host = os.getenv('FLASK_HOST', '127.0.0.1')
         port = int(os.getenv('FLASK_PORT', 5000))
         debug = app.config.get('DEBUG', False)
-        
+
         # Log application startup
         logger.info(
             "Starting Inventory Management API",
