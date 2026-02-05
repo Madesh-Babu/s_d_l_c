@@ -480,6 +480,21 @@ def change_password():
         return jsonify({"error": "Password change failed"}), 500
 
 
+@auth_b_p.route("/debug-config", methods=['GET'])
+def debug_config():
+    """Debug endpoint to check configuration."""
+    return jsonify({
+        "environment": settings.ENVIRONMENT,
+        "is_development": settings.is_development(),
+        "bypass_auth": settings.feature_toggles.BYPASS_AUTH,
+        "both_conditions": settings.feature_toggles.BYPASS_AUTH and settings.is_development(),
+        "feature_toggles": {
+            "BYPASS_AUTH": settings.feature_toggles.BYPASS_AUTH,
+            "ENABLE_JWT": settings.feature_toggles.ENABLE_JWT,
+            "ENABLE_RATE_LIMITING": settings.feature_toggles.ENABLE_RATE_LIMITING
+        }
+    })
+
 @auth_b_p.route("/validate-password", methods=["POST"])
 def validate_password():
     """Validate password strength without changing it."""
