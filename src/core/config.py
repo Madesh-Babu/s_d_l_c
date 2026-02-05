@@ -14,6 +14,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class FeatureToggles(BaseSettings):
     """Feature toggle configuration for different environments."""
     
+    model_config = SettingsConfigDict(
+        env_file='.env.local',
+        env_file_encoding='utf-8',
+        case_sensitive=False,
+        extra='ignore'
+    )
+    
     # Authentication Features
     BYPASS_AUTH: bool = Field(False, description="Bypass authentication in local development")
     ENABLE_JWT: bool = Field(True, description="Enable JWT authentication")
@@ -66,7 +73,7 @@ class EnvironmentConfig(BaseSettings):
     """Base environment configuration."""
     
     model_config = SettingsConfigDict(
-        env_file='.env',
+        env_file='.env.local',
         env_file_encoding='utf-8',
         case_sensitive=False,
         extra='ignore'
