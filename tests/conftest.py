@@ -1,14 +1,24 @@
 import pytest
-from app import create_app, db
-from app.config import TestConfig
+import os
+import sys
+
+# Add the project root to Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
+
+from src.api import create_app, db
+from src.core.config import config
 from flask_jwt_extended import create_access_token
 
 
 @pytest.fixture
 def app():
-    app = create_app(TestConfig)
+    # Set environment to testing for pytest
+    os.environ['ENVIRONMENT'] = 'testing'
+    
+    app = create_app('testing')
     with app.app_context():
-        print("aaaa",app.config["SQLALCHEMY_DATABASE_URI"])
+        print("Database URI:", app.config.get("SQLALCHEMY_DATABASE_URI"))
         db.create_all()
         yield app
         db.session.remove()
