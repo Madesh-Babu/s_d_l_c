@@ -274,3 +274,4 @@ logger.bind(request_id="abc123").info("Processing request")
 - [ ] Access controls configured
 - [ ] Retention policies defined
 - [ ] Audit logging enabled
+

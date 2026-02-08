@@ -177,3 +177,4 @@ curl -X POST http://localhost:5000/api/users \
 2. **Check toggle** - Validate BYPASS_AUTH configuration
 3. **Review logs** - Check bypass activation logs
 4. **Test isolation** - Ensure clean test environment
+

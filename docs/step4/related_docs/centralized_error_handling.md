@@ -228,3 +228,4 @@ class BaseApplicationException(Exception):
 - **Critical errors** - High-severity error occurrences
 - **Service degradation** - Performance impact from errors
 - **Security events** - Security-related error patterns
+

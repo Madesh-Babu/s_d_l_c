@@ -491,3 +491,4 @@ These principles provide a solid foundation for continued development and mainte
 - [Docker Guide](docs/step5/docker_guide.md) - Container deployment instructions
 - [Architecture Overview](README.md) - Project structure and features
 - [API Documentation](docs/api/) - Detailed API endpoint documentation
+

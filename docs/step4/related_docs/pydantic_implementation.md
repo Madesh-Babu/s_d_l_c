@@ -128,3 +128,4 @@ def validate_password_strength(cls, v):
 - **Avoid over-validation** - Validate only when needed
 - **Use appropriate types** - Choose the right data types
 - **Profile validation** - Monitor performance impact
+
