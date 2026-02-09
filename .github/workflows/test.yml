@@ -1,0 +1,43 @@
+name: Run Tests
+
+on:
+  push:
+    branches: [ main, master, dev, develop ]
+  pull_request:
+    branches: [ main, master, dev, develop ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    name: Unit Tests (No External Dependencies)
+    strategy:
+      matrix:
+        python-version: ['3.11']
+      fail-fast: false
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/requirements.txt
+        pip install -r dev_requirements.txt
+
+    - name: Run unit tests
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+      run: |
+        pytest tests/unit/ -v --tb=short --no-cov --disable-warnings

@@ -1,0 +1,51 @@
+name: PR Checklist Validation
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  check-pr-template:
+    runs-on: self-hosted
+    steps:
+      - name: Check PR checklist
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prBody = context.payload.pull_request.body || '';
+            const requiredSections = [
+            'A. Core Code Quality',
+            'B. Test Coverage',
+            'C. Linting, Style & Docs',
+            'D. Security & Compliance',
+            'E. Architecture & Patterns',
+            'F. PR Description & Communication',
+            'G. Review Process',
+            'H. Technical Validation Checklist'
+            ];
+
+            let allChecked = true;
+            let uncheckedSections = [];
+
+            for (const section of requiredSections) {
+            const regex = new RegExp(`- \\[x\\] \\*\\*${section}\\*\\*`, 'i');
+            if (!regex.test(prBody)) {
+                allChecked = false;
+                uncheckedSections.push(section);
+            }
+            }
+
+            if (!allChecked) {
+            const issue_number = context.payload.pull_request.number;
+            const repo = context.repo.repo;
+            const owner = context.repo.owner;
+            await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: `❌ Please check all required PR checklist items before merging. Missing: ${uncheckedSections.join(', ')}` 
+            });
+            core.setFailed('Not all required PR checklist items are checked.');
+            } else {
+            console.log('All required PR checklist items are checked.');
+            }

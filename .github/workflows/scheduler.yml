@@ -1,0 +1,22 @@
+name: 'Task Monitor'
+on:
+    workflow_call:
+    workflow_dispatch:
+    schedule:
+      - cron: '30 2 * * 1-5'
+  
+
+permissions: 
+  contents: read
+  issues: write
+  repository-projects: read   
+
+jobs:
+  task_monitor:
+    name: Task Monitor
+    uses: bitcot/aiqa/.github/workflows/task_monitor.yml@v4.1.0
+    with:
+      branch: v4.1.0
+      REPO_DETAILS: ${{ github.repository }}
+    secrets:
+      GH_API_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}

@@ -1,0 +1,14 @@
+feature: ['feature/*', 'feat/*']
+fix: ['fix/*', 'bugfix/*']
+dev: dev
+hotfix: hotfix/*
+release: release/*
+docs: docs/*
+chore: chore/*
+style: style/*
+refactor: refactor/*
+perf: perf/*
+test: test/*
+build: build/*
+ci: ci/*
+revert: revert/* 
