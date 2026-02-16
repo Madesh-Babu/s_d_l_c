@@ -29,7 +29,7 @@ permissions:
 
 jobs:
   quality-engineering:
-    name: Flask Quality Checks
+    name: Quality Checks
     uses: bitcot/aiqa/.github/workflows/quality-engineering.yml@v4.1.0
     with:
       danger: true
