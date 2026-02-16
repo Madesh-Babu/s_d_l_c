@@ -1,14 +1,23 @@
-name: PR Checklist Validation
+name: Flask PR Validation
 
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
+    branches: [main, master, dev, develop,feat/step4]
+
+permissions:
+  pull-requests: write
+  issues: write
 
 jobs:
-  check-pr-template:
-    runs-on: self-hosted
+  pr-checklist-validation:
+    runs-on: ubuntu-latest
+    name: PR Checklist Validation
     steps:
-      - name: Check PR checklist
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate PR Template
         uses: actions/github-script@v7
         with:
           script: |
@@ -49,3 +58,14 @@ jobs:
             } else {
             console.log('All required PR checklist items are checked.');
             }
+
+  pr-labeler:
+    runs-on: ubuntu-latest
+    name: Auto Label PR
+    steps:
+      - name: Label PR
+        uses: actions/labeler@v4
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          configuration-path: .github/pr-labeler.yml
+          sync-labels: true

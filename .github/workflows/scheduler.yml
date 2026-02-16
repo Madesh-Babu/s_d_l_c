@@ -1,22 +1,31 @@
-name: 'Task Monitor'
+name: 'Flask Task Monitor'
 on:
     workflow_call:
     workflow_dispatch:
     schedule:
-      - cron: '30 2 * * 1-5'
-  
+      - cron: '30 2 * * 1-5'  # Weekdays at 2:30 AM UTC
 
 permissions: 
   contents: read
   issues: write
-  repository-projects: read   
+  repository-projects: read
+  pull-requests: read
 
 jobs:
   task_monitor:
-    name: Task Monitor
+    name: Flask Task Monitoring
     uses: bitcot/aiqa/.github/workflows/task_monitor.yml@v4.1.0
     with:
       branch: v4.1.0
       REPO_DETAILS: ${{ github.repository }}
     secrets:
       GH_API_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+  health_check:
+    name: Flask Health Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Flask Service Health
+        run: |
+          echo "Flask service health check completed"
+          # Add actual health check logic here if needed

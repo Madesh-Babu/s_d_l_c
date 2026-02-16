@@ -1,23 +1,24 @@
-name: Run Tests
+name: Flask Test Suite
 
 on:
   push:
-    branches: [ main, master, dev, develop ]
+    branches: [ main, master, dev, develop, feat/step4 ]
   pull_request:
-    branches: [ main, master, dev, develop ]
+    branches: [ main, master, dev, develop, feat/step4 ]
   workflow_dispatch:
 
 permissions:
   contents: read
+  checks: write
+  pull-requests: write
 
 jobs:
-
   unit-tests:
     runs-on: ubuntu-latest
-    name: Unit Tests (No External Dependencies)
+    name: Unit Tests (Python ${{ matrix.python-version }})
     strategy:
       matrix:
-        python-version: ['3.11']
+        python-version: ['3.11', '3.10']
       fail-fast: false
 
     steps:
@@ -41,3 +42,79 @@ jobs:
         PYTHONPATH: ${{ github.workspace }}
       run: |
         pytest tests/unit/ -v --tb=short --no-cov --disable-warnings
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    name: Integration Tests
+    needs: unit-tests
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/requirements.txt
+        pip install -r dev_requirements.txt
+
+    - name: Run integration tests
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+        DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
+      run: |
+        pytest tests/integration/ -v --tb=short --disable-warnings
+
+  code-quality:
+    runs-on: ubuntu-latest
+    name: Code Quality Checks
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/requirements.txt
+        pip install -r dev_requirements.txt
+
+    - name: Run Black formatting check
+      run: |
+        black --check .
+
+    - name: Run Flake8 linting
+      run: |
+        flake8 .
+
+    - name: Run MyPy type checking
+      run: |
+        mypy src/ --ignore-missing-imports
+
+    - name: Run security checks
+      run: |
+        bandit -r src/ -f json -o bandit-report.json || true

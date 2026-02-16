@@ -1,10 +1,11 @@
-name: '[PRN] Quality Engineering'
+name: '[Flask] Quality Engineering'
 on:
   pull_request:
     branches:
       - main
       - master
       - dev
+      - develop
     types:
       - opened
       - reopened
@@ -16,21 +17,27 @@ on:
       - main
       - master
       - dev
+      - develop
+      - feat/step4
 
 permissions:
   contents: write 
   id-token: write  
   pull-requests: write   
+  checks: write
+  security-events: write
 
 jobs:
   quality-engineering:
-    name: QE
+    name: Flask Quality Checks
     uses: bitcot/aiqa/.github/workflows/quality-engineering.yml@v4.1.0
     with:
       danger: true
       nodeLint: false
       pythonFormat: true
+      pythonLint: true
       sonar: true
+      securityScan: true
     secrets:
       githubToken: ${{ secrets.GITHUB_TOKEN }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

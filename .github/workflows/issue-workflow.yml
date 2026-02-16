@@ -1,4 +1,4 @@
-name: 'Issue workflow'
+name: 'Flask Issue Management'
 on:
   issues:
     types: [opened, edited, deleted, closed, reopened, assigned, labeled, milestoned]
@@ -6,21 +6,19 @@ on:
     types: [deleted]
 
 permissions: 
-  contents: read  # Ensures access to the repository's contents (for read actions like checkout)
-  issues: write   # Ensures write access to issues (if needed)
-  repository-projects: read # If you need access to project boards (optional)
+  contents: read
+  issues: write
+  repository-projects: read
 
 jobs:
   issue-fields-validator:
-    name: QE
-
+    name: Issue Fields Validation
     uses: bitcot/aiqa/.github/workflows/issue_fields_validator.yml@v4.0.5
     with:
       branch: v4.0.5
-
     secrets:
       GH_API_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   
   sub-issue-fields-validator:
-    name: QE
+    name: Sub-Issue Validation
     uses: bitcot/aiqa/.github/workflows/sub_issue_fields_validator.yml@v4.0.5
