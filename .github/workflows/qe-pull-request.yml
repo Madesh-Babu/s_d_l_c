@@ -1,4 +1,4 @@
-name: '[Flask] Quality Engineering'
+name: '[QE] Quality Engineering'
 on:
   pull_request:
     branches:
