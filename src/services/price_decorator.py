@@ -1,8 +1,9 @@
-
 from abc import ABC, abstractmethod
+
 
 class IPrice(ABC):
     """Interface for price components"""
+
     @abstractmethod
     def get_price(self):
         pass
@@ -10,6 +11,7 @@ class IPrice(ABC):
 
 class Price(IPrice):
     """Base class representing the original price"""
+
     def __init__(self, base_price: float):
         self._base_price = base_price
 
@@ -19,6 +21,7 @@ class Price(IPrice):
 
 class PriceDecorator(IPrice):
     """Abstract decorator that implements IPrice"""
+
     def __init__(self, price_component: IPrice):
         self._price_component = price_component
 
@@ -29,6 +32,7 @@ class PriceDecorator(IPrice):
 
 class DiscountDecorator(PriceDecorator):
     """Applies discount to the base price"""
+
     def __init__(self, price_component: IPrice, discount_percent: float):
         super().__init__(price_component)
         self.discount_percent = discount_percent
@@ -40,6 +44,7 @@ class DiscountDecorator(PriceDecorator):
 
 class TaxDecorator(PriceDecorator):
     """Adds tax to the price after discount"""
+
     def __init__(self, price_component: IPrice, tax_percent: float):
         super().__init__(price_component)
         self.tax_percent = tax_percent
