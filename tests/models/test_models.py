@@ -7,7 +7,14 @@ including User, Product, and Category models.
 
 import pytest
 from src.models.models import User, Product, Category
-from src.models.schemas import UserCreate, UserUpdate, ProductCreate, ProductUpdate, CategoryCreate, CategoryUpdate
+from src.models.schemas import (
+    UserCreate,
+    UserUpdate,
+    ProductCreate,
+    ProductUpdate,
+    CategoryCreate,
+    CategoryUpdate,
+)
 from datetime import datetime
 
 
@@ -17,13 +24,9 @@ class TestUserModel:
     def test_user_creation(self, app):
         """Test user model creation."""
         with app.app_context():
-            user = User(
-                username="testuser",
-                email="test@example.com",
-                role="staff"
-            )
+            user = User(username="testuser", email="test@example.com", role="staff")
             user.set_password("TestPass123!")
-            
+
             assert user.username == "testuser"
             assert user.email == "test@example.com"
             assert user.role == "staff"
@@ -34,7 +37,7 @@ class TestUserModel:
         with app.app_context():
             user = User(username="testuser", email="test@example.com")
             user.set_password("TestPass123!")
-            
+
             # Password should be hashed, not stored as plain text
             assert user.password_hash != "TestPass123!"
             assert len(user.password_hash) > 50  # Hash should be longer
@@ -44,10 +47,10 @@ class TestUserModel:
         with app.app_context():
             user = User(username="testuser", email="test@example.com")
             user.set_password("TestPass123!")
-            
+
             # Correct password should verify
             assert user.check_password("TestPass123!") is True
-            
+
             # Wrong password should not verify
             assert user.check_password("WrongPass123!") is False
 
@@ -59,11 +62,11 @@ class TestUserModel:
                 username="testuser",
                 email="test@example.com",
                 role="staff",
-                created_at=datetime.utcnow()
+                created_at=datetime.utcnow(),
             )
-            
+
             user_dict = user.to_dict()
-            
+
             assert user_dict["id"] == 1
             assert user_dict["username"] == "testuser"
             assert user_dict["email"] == "test@example.com"
@@ -75,7 +78,7 @@ class TestUserModel:
         """Test user string representation."""
         with app.app_context():
             user = User(id=1, username="testuser", email="test@example.com")
-            
+
             repr_str = repr(user)
             assert "testuser" in repr_str
             assert "test@example.com" in repr_str
@@ -97,12 +100,12 @@ class TestUserModel:
             user1.set_password("TestPass123!")
             db.session.add(user1)
             db.session.commit()
-            
+
             # Try to create second user with same email
             user2 = User(username="user2", email="test@example.com")
             user2.set_password("TestPass123!")
             db.session.add(user2)
-            
+
             with pytest.raises(Exception):  # Should raise integrity error
                 db.session.commit()
 
@@ -118,9 +121,9 @@ class TestProductModel:
                 description="Test description",
                 price=99.99,
                 stock_quantity=100,
-                category_id=create_test_category.id
+                category_id=create_test_category.id,
             )
-            
+
             assert product.name == "Test Product"
             assert product.description == "Test description"
             assert product.price == 99.99
@@ -137,11 +140,11 @@ class TestProductModel:
                 price=99.99,
                 stock_quantity=100,
                 category_id=create_test_category.id,
-                created_at=datetime.utcnow()
+                created_at=datetime.utcnow(),
             )
-            
+
             product_dict = product.to_dict()
-            
+
             assert product_dict["id"] == 1
             assert product_dict["name"] == "Test Product"
             assert product_dict["price"] == 99.99
@@ -156,9 +159,9 @@ class TestProductModel:
                 id=1,
                 name="Test Product",
                 price=99.99,
-                category_id=create_test_category.id
+                category_id=create_test_category.id,
             )
-            
+
             repr_str = repr(product)
             assert "Test Product" in repr_str
             assert "99.99" in repr_str
@@ -167,11 +170,9 @@ class TestProductModel:
         """Test product-category relationship."""
         with app.app_context():
             product = Product(
-                name="Test Product",
-                price=99.99,
-                category_id=create_test_category.id
+                name="Test Product", price=99.99, category_id=create_test_category.id
             )
-            
+
             # Should be able to access category
             assert product.category_id == create_test_category.id
 
@@ -182,9 +183,7 @@ class TestProductModel:
             valid_prices = [0, 0.01, 99.99, 1000.00]
             for price in valid_prices:
                 product = Product(
-                    name="Test",
-                    price=price,
-                    category_id=create_test_category.id
+                    name="Test", price=price, category_id=create_test_category.id
                 )
                 assert product.price == price
 
@@ -198,7 +197,7 @@ class TestProductModel:
                     name="Test",
                     price=99.99,
                     stock_quantity=stock,
-                    category_id=create_test_category.id
+                    category_id=create_test_category.id,
                 )
                 assert product.stock_quantity == stock
 
@@ -209,10 +208,10 @@ class TestProductModel:
             product = Product(
                 name="Test Product",
                 price=99.99,
-                category_id=999  # Non-existent category
+                category_id=999,  # Non-existent category
             )
             db.session.add(product)
-            
+
             with pytest.raises(Exception):  # Should raise foreign key error
                 db.session.commit()
 
@@ -223,11 +222,8 @@ class TestCategoryModel:
     def test_category_creation(self, app):
         """Test category model creation."""
         with app.app_context():
-            category = Category(
-                name="Test Category",
-                description="Test description"
-            )
-            
+            category = Category(name="Test Category", description="Test description")
+
             assert category.name == "Test Category"
             assert category.description == "Test description"
 
@@ -238,11 +234,11 @@ class TestCategoryModel:
                 id=1,
                 name="Test Category",
                 description="Test description",
-                created_at=datetime.utcnow()
+                created_at=datetime.utcnow(),
             )
-            
+
             category_dict = category.to_dict()
-            
+
             assert category_dict["id"] == 1
             assert category_dict["name"] == "Test Category"
             assert category_dict["description"] == "Test description"
@@ -252,16 +248,18 @@ class TestCategoryModel:
         """Test category string representation."""
         with app.app_context():
             category = Category(id=1, name="Test Category")
-            
+
             repr_str = repr(category)
             assert "Test Category" in repr_str
 
-    def test_category_product_relationship(self, app, create_test_category, create_test_product):
+    def test_category_product_relationship(
+        self, app, create_test_category, create_test_product
+    ):
         """Test category-product relationship."""
         with app.app_context():
             category = create_test_category
             product = create_test_product
-            
+
             # Product should be associated with category
             assert product.category_id == category.id
 
@@ -272,11 +270,11 @@ class TestCategoryModel:
             category1 = Category(name="Test Category", description="First")
             db.session.add(category1)
             db.session.commit()
-            
+
             # Try to create second category with same name
             category2 = Category(name="Test Category", description="Second")
             db.session.add(category2)
-            
+
             with pytest.raises(Exception):  # Should raise integrity error
                 db.session.commit()
 
@@ -291,9 +289,9 @@ class TestModelSchemas:
             "username": "testuser",
             "email": "test@example.com",
             "password": "TestPass123!",
-            "role": "staff"
+            "role": "staff",
         }
-        
+
         user = UserCreate(**valid_data)
         assert user.username == "testuser"
         assert user.email == "test@example.com"
@@ -305,9 +303,9 @@ class TestModelSchemas:
             "username": "testuser",
             "email": "invalid-email",
             "password": "TestPass123!",
-            "role": "staff"
+            "role": "staff",
         }
-        
+
         with pytest.raises(Exception):  # Should raise validation error
             UserCreate(**invalid_data)
 
@@ -317,9 +315,9 @@ class TestModelSchemas:
             "username": "testuser",
             "email": "test@example.com",
             "password": "123",
-            "role": "staff"
+            "role": "staff",
         }
-        
+
         with pytest.raises(Exception):  # Should raise validation error
             UserCreate(**invalid_data)
 
@@ -330,9 +328,9 @@ class TestModelSchemas:
             "description": "Test description",
             "price": 99.99,
             "stock_quantity": 100,
-            "category_id": 1
+            "category_id": 1,
         }
-        
+
         product = ProductCreate(**valid_data)
         assert product.name == "Test Product"
         assert product.price == 99.99
@@ -345,30 +343,24 @@ class TestModelSchemas:
             "description": "Test description",
             "price": -10,  # Negative price
             "stock_quantity": 100,
-            "category_id": 1
+            "category_id": 1,
         }
-        
+
         with pytest.raises(Exception):  # Should raise validation error
             ProductCreate(**invalid_data)
 
     def test_category_create_schema(self):
         """Test CategoryCreate schema validation."""
-        valid_data = {
-            "name": "Test Category",
-            "description": "Test description"
-        }
-        
+        valid_data = {"name": "Test Category", "description": "Test description"}
+
         category = CategoryCreate(**valid_data)
         assert category.name == "Test Category"
         assert category.description == "Test description"
 
     def test_category_create_schema_empty_name(self):
         """Test CategoryCreate schema with empty name."""
-        invalid_data = {
-            "name": "",  # Empty name
-            "description": "Test description"
-        }
-        
+        invalid_data = {"name": "", "description": "Test description"}  # Empty name
+
         with pytest.raises(Exception):  # Should raise validation error
             CategoryCreate(**invalid_data)
 
@@ -376,15 +368,17 @@ class TestModelSchemas:
 class TestModelIntegration:
     """Test model integration and relationships."""
 
-    def test_category_product_cascade_delete(self, app, db, create_test_category, create_test_product):
+    def test_category_product_cascade_delete(
+        self, app, db, create_test_category, create_test_product
+    ):
         """Test that deleting category with products fails (protect)."""
         with app.app_context():
             category = create_test_category
             product = create_test_product
-            
+
             # Try to delete category (should fail due to foreign key constraint)
             db.session.delete(category)
-            
+
             with pytest.raises(Exception):  # Should raise integrity error
                 db.session.commit()
 
@@ -394,27 +388,29 @@ class TestModelIntegration:
             user = User(
                 username=sample_user_data["username"],
                 email=sample_user_data["email"],
-                role=sample_user_data["role"]
+                role=sample_user_data["role"],
             )
             user.set_password(sample_user_data["password"])
             db.session.add(user)
             db.session.commit()
-            
+
             # Should have created_at timestamp
             assert user.created_at is not None
             assert isinstance(user.created_at, datetime)
 
-    def test_model_string_conversions(self, app, create_test_user, create_test_product, create_test_category):
+    def test_model_string_conversions(
+        self, app, create_test_user, create_test_product, create_test_category
+    ):
         """Test model string conversions and representations."""
         with app.app_context():
             # User string conversion
             user_str = str(create_test_user)
             assert create_test_user.username in user_str
-            
+
             # Product string conversion
             product_str = str(create_test_product)
             assert create_test_product.name in product_str
-            
+
             # Category string conversion
             category_str = str(create_test_category)
             assert create_test_category.name in category_str
