@@ -4,15 +4,17 @@ from flask import jsonify
 from werkzeug.exceptions import Forbidden, Unauthorized
 from src.models.models import User
 
+
 def role_required(*roles):
     """Restrict route access to specific roles (checks DB or token claims)."""
+
     def wrapper(fn):
         @wraps(fn)
         def decorator(*args, **kwargs):
             verify_jwt_in_request()
             identity = get_jwt_identity()
             claims = get_jwt()
-            print('ccccc')
+            print("ccccc")
             token_role = claims.get("role")
             if token_role:
                 if token_role not in roles:
@@ -28,5 +30,7 @@ def role_required(*roles):
                 return fn(*args, **kwargs)
             except ValueError:
                 raise Unauthorized("Invalid token identity type")
+
         return decorator
+
     return wrapper
