@@ -7,7 +7,7 @@ This module provides configuration, fixtures, and utilities for integration test
 import pytest
 import json
 from datetime import datetime
-from src import create_app
+from src.api import create_app
 from src.models.models import db, User, Product, Category
 from src.core.config import settings
 
